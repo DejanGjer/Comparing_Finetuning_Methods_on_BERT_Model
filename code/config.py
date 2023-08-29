@@ -2,11 +2,11 @@
 # lora
 use_lora = False
 # sampling
-use_sampling = True
+use_sampling = False
 sample_size = 160
 # training
 early_stopping_patience = 3
-log_steps = 2
+log_steps = 250
 # model
 model_name = 'bert-base-uncased'
 # save directory

@@ -2,7 +2,7 @@ import wandb
 
 sweep_config = {
     'project': 'lora-emotion-classification',
-    'method': 'random',
+    'method': 'grid',
     'metric': {
       'name': 'eval/accuracy',
       'goal': 'maximize'   
