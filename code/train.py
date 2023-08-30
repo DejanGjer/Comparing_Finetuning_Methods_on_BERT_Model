@@ -29,6 +29,7 @@ class Train:
         self.batch_size = hyperparameters["batch_size"]
 
         # config parameters
+        self.max_epochs = config.max_epochs
         self.early_stopping_patience = config.early_stopping_patience
         self.model_name = config.model_name
         self.use_lora = config.use_lora
@@ -62,6 +63,7 @@ class Train:
         self.training_args = TrainingArguments(
             output_dir=self.save_dir,
             learning_rate=self.learning_rate,
+            num_train_epochs = self.max_epochs,
             per_device_train_batch_size=self.batch_size,
             per_device_eval_batch_size=self.batch_size,
             weight_decay=self.weight_decay,

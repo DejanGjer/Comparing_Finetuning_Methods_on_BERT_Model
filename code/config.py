@@ -5,7 +5,8 @@ use_lora = False
 use_sampling = False
 sample_size = 160
 # training
-early_stopping_patience = 3
+max_epochs = 10 
+early_stopping_patience = 4
 log_steps = 250
 # model
 model_name = 'bert-base-uncased'

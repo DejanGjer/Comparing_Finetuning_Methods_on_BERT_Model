@@ -74,9 +74,9 @@ if __name__ == "__main__":
     if sweep_id is not None:
         # set up the sweep agent
         if args.run_count != 0:
-            wandb.agent(sweep_id, function=train, count=args.run_count)
+            wandb.agent(sweep_id, function=train, count=args.run_count, project=sweep_config['project'])
         else: 
-            wandb.agent(sweep_id, function=train)
+            wandb.agent(sweep_id, function=train, project=sweep_config['project'])
     else:
         # run the training
         train(params=prepare_params(args))
