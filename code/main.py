@@ -17,7 +17,8 @@ def train(params=None):
     print("Training parameters")
     print(parameters)
     trainer = Train(parameters, base_config, run_name=run.name)
-    trainer.run()
+    best_metrics = trainer.run()
+    wandb.log(best_metrics)
     wandb.finish()
 
 def prepare_params(args):

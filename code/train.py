@@ -10,10 +10,10 @@ from transformers import (
 from peft import get_peft_config, PeftModel, PeftConfig, get_peft_model, LoraConfig, TaskType, LoraConfig
 import evaluate
 import torch
-from sklearn.metrics import accuracy_score, f1_score
 import numpy as np
 from datetime import datetime as dt
 import os
+import pandas as pd
 
 
 class Train:
@@ -33,6 +33,9 @@ class Train:
         self.early_stopping_patience = config.early_stopping_patience
         self.model_name = config.model_name
         self.use_lora = config.use_lora
+        self.r = config.r
+        self.lora_alpha = config.lora_alpha
+        self.lora_dropout = config.lora_dropout
         self.use_sampling = config.use_sampling
         self.sample_size = config.sample_size
         self.root_save_dir = config.root_save_dir
@@ -41,12 +44,49 @@ class Train:
         self.save_checkpoint_limit = config.save_checkpoint_limit
         self.data_seed = config.data_seed
 
+        # save configuration
+        self.save_configuration(os.path.join(self.save_dir, "configuration.txt"))
+
+    def save_configuration(self, path):
+        # create directories that do not exist in the path
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w") as f:
+            f.write(f"run_name: {self.run_name}\n")
+            f.write(f"learning_rate: {self.learning_rate}\n")
+            f.write(f"weight_decay: {self.weight_decay}\n")
+            f.write(f"batch_size: {self.batch_size}\n")
+            f.write(f"max_epochs: {self.max_epochs}\n")
+            f.write(f"early_stopping_patience: {self.early_stopping_patience}\n")
+            f.write(f"model_name: {self.model_name}\n")
+            f.write(f"use_lora: {self.use_lora}\n")
+            f.write(f"r: {self.r}\n")
+            f.write(f"lora_alpha: {self.lora_alpha}\n")
+            f.write(f"lora_dropout: {self.lora_dropout}\n")
+            f.write(f"use_sampling: {self.use_sampling}\n")
+            f.write(f"sample_size: {self.sample_size}\n")
+            f.write(f"root_save_dir: {self.root_save_dir}\n")
+            f.write(f"save_dir: {self.save_dir}\n")
+            f.write(f"log_steps: {self.log_steps}\n")
+            f.write(f"save_checkpoint_limit: {self.save_checkpoint_limit}\n")
+            f.write(f"data_seed: {self.data_seed}\n")
+
+
     def run(self):
         self.load_and_prepare_dataset()
         self.set_training_arguments()
         self.set_metrics()
         # create model
         self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=len(self.label2id))
+        if self.use_lora:
+            lora_config = LoraConfig(
+                task_type=TaskType.SEQ_CLS, inference_mode=False, r=self.r, lora_alpha=self.lora_alpha, 
+                lora_dropout=self.lora_dropout, bias="all"
+            )
+            self.model = get_peft_model(self.model, lora_config)
+            # save trainable parameters count
+            with open(os.path.join(self.save_dir, "trainable_params.txt"), "w") as f:
+                f.write(self.get_trainable_parameters(self.model))
+
         trainer = Trainer(
             model=self.model,
             args=self.training_args,
@@ -58,6 +98,24 @@ class Train:
             callbacks = [EarlyStoppingCallback(early_stopping_patience=self.early_stopping_patience)]
         )
         trainer.train() 
+        log_df = pd.DataFrame(trainer.state.log_history)
+        # save log history
+        log_df.to_csv(os.path.join(self.save_dir, "log.csv"), index=False)
+        # get best evaluation accuracy
+        best_eval_acc = log_df["eval_accuracy"].max()
+        # get step of best evaluation accuracy
+        best_eval_acc_step = log_df[log_df["eval_accuracy"] == best_eval_acc]["step"].values[0]
+        # get best evaluation loss
+        best_eval_loss = log_df["eval_loss"].min()
+        # get best evaluation f1
+        best_eval_f1 = log_df["eval_f1"].max()
+
+        return {
+            "best_eval_acc": best_eval_acc,
+            "best_eval_acc_step": best_eval_acc_step,
+            "best_eval_loss": best_eval_loss,
+            "best_eval_f1": best_eval_f1
+        }
 
     def set_training_arguments(self):
         self.training_args = TrainingArguments(
@@ -124,3 +182,17 @@ class Train:
             "recall": self.metric_recall.compute(predictions=predictions, references=labels, average="weighted")["recall"],
             "f1": self.metric_f1.compute(predictions=predictions, references=labels, average="weighted")["f1"],
         }
+    
+    def get_trainable_parameters(self, model):
+        """
+        Prints the number of trainable parameters in the model.
+        """
+        trainable_params = 0
+        all_param = 0
+        for _, param in model.named_parameters():
+            all_param += param.numel()
+            if param.requires_grad:
+                trainable_params += param.numel()
+        
+        return f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}"
+        
