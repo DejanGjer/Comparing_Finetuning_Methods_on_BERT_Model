@@ -14,6 +14,7 @@ import numpy as np
 from datetime import datetime as dt
 import os
 import pandas as pd
+import random
 
 
 class Train:
@@ -27,17 +28,26 @@ class Train:
         self.learning_rate = hyperparameters["learning_rate"]
         self.weight_decay = hyperparameters["weight_decay"]
         self.batch_size = hyperparameters["batch_size"]
+        # self.r = hyperparameters["r"]
+        # self.lora_alpha = hyperparameters["lora_alpha"]
+        # self.lora_dropout = hyperparameters["lora_dropout"]
+        # self.lora_bias = hyperparameters["lora_bias"]
+        # self.lora_use_linear_layers = hyperparameters["lora_use_linear_layers"]
+        self.r = config.r
+        self.lora_alpha = config.lora_alpha
+        self.lora_dropout = config.lora_dropout
+        self.lora_bias = config.lora_bias
+        self.lora_use_linear_layers = config.lora_use_linear_layers
 
         # config parameters
         self.max_epochs = config.max_epochs
         self.early_stopping_patience = config.early_stopping_patience
         self.model_name = config.model_name
         self.use_lora = config.use_lora
-        self.r = config.r
-        self.lora_alpha = config.lora_alpha
-        self.lora_dropout = config.lora_dropout
         self.use_sampling = config.use_sampling
         self.sample_size = config.sample_size
+        self.do_test = config.do_test
+        self.num_samples_to_show = config.num_samples_to_show
         self.root_save_dir = config.root_save_dir
         self.save_dir = os.path.join(self.root_save_dir, self.run_name)
         self.log_steps = config.log_steps
@@ -64,6 +74,8 @@ class Train:
             f.write(f"lora_dropout: {self.lora_dropout}\n")
             f.write(f"use_sampling: {self.use_sampling}\n")
             f.write(f"sample_size: {self.sample_size}\n")
+            f.write(f"do_test: {self.do_test}\n")
+            f.write(f"num_samples_to_show: {self.num_samples_to_show}\n")
             f.write(f"root_save_dir: {self.root_save_dir}\n")
             f.write(f"save_dir: {self.save_dir}\n")
             f.write(f"log_steps: {self.log_steps}\n")
@@ -78,11 +90,17 @@ class Train:
         # create model
         self.model = AutoModelForSequenceClassification.from_pretrained(self.model_name, num_labels=len(self.label2id))
         if self.use_lora:
-            lora_config = LoraConfig(
-                task_type=TaskType.SEQ_CLS, inference_mode=False, r=self.r, lora_alpha=self.lora_alpha, 
-                lora_dropout=self.lora_dropout, bias="all"
-            )
-            self.model = get_peft_model(self.model, lora_config)
+            if self.lora_use_linear_layers:
+                self.lora_config = LoraConfig(
+                    task_type=TaskType.SEQ_CLS, inference_mode=False, r=self.r, lora_alpha=self.lora_alpha, 
+                    lora_dropout=self.lora_dropout, bias=self.lora_bias, target_modules=["query", "key", "value", "dense"]
+                )
+            else:
+                self.lora_config = LoraConfig(
+                    task_type=TaskType.SEQ_CLS, inference_mode=False, r=self.r, lora_alpha=self.lora_alpha, 
+                    lora_dropout=self.lora_dropout, bias=self.lora_bias
+                )
+            self.model = get_peft_model(self.model, self.lora_config)
             # save trainable parameters count
             with open(os.path.join(self.save_dir, "trainable_params.txt"), "w") as f:
                 f.write(self.get_trainable_parameters(self.model))
@@ -109,13 +127,56 @@ class Train:
         best_eval_loss = log_df["eval_loss"].min()
         # get best evaluation f1
         best_eval_f1 = log_df["eval_f1"].max()
-
-        return {
+        metrics = {
             "best_eval_acc": best_eval_acc,
             "best_eval_acc_step": best_eval_acc_step,
             "best_eval_loss": best_eval_loss,
             "best_eval_f1": best_eval_f1
         }
+
+        # testing
+        if self.do_test:
+            test_metrics = self.test(trainer)
+            metrics.update(test_metrics)
+          
+        return metrics
+    
+    def test(self, trainer):
+        predictions, label_ids, test_metrics = trainer.predict(self.dataset["test"])
+        # get predicted labels from logits
+        predicted_labels = np.argmax(predictions, axis=1)
+        correct_predictions_indexes = np.where(predicted_labels == label_ids)[0]
+        wrong_predictions_indexes = np.where(predicted_labels != label_ids)[0]
+        # sample correct predictions
+        num_correct_to_sample = min(self.num_samples_to_show, len(correct_predictions_indexes))
+        num_wrong_to_sample = min(self.num_samples_to_show, len(wrong_predictions_indexes))
+        correct_predictions_indexes = random.sample(list(correct_predictions_indexes), num_correct_to_sample)
+        wrong_predictions_indexes = random.sample(list(wrong_predictions_indexes), num_wrong_to_sample)
+        # get correct predictions
+        correct_predictions_input = self.dataset["test"][correct_predictions_indexes]
+        # decode input_ids of correct predictions to text
+        correct_sentences = self.tokenizer.batch_decode(correct_predictions_input["input_ids"], skip_special_tokens=True)
+        # create dataframe of correct prediction sentences, predicted labels, and true labels
+        correct_predictions_df = pd.DataFrame({
+            "sentence": correct_sentences,
+            "predicted_label": [self.id2label[label_id] for label_id in predicted_labels[correct_predictions_indexes]],
+            "true_label": [self.id2label[label_id] for label_id in label_ids[correct_predictions_indexes]]
+        })
+        # get wrong predictions
+        wrong_predictions_input = self.dataset["test"][wrong_predictions_indexes]
+        # decode input_ids of wrong predictions to text
+        wrong_sentences = self.tokenizer.batch_decode(wrong_predictions_input["input_ids"], skip_special_tokens=True)
+        # create dataframe of wrong prediction sentences, predicted labels, and true labels
+        wrong_predictions_df = pd.DataFrame({
+            "sentence": wrong_sentences,
+            "predicted_label": [self.id2label[label_id] for label_id in predicted_labels[wrong_predictions_indexes]],
+            "true_label": [self.id2label[label_id] for label_id in label_ids[wrong_predictions_indexes]]
+        })
+        # save test results
+        correct_predictions_df.to_csv(os.path.join(self.save_dir, "correct_predictions.csv"), index=False)
+        wrong_predictions_df.to_csv(os.path.join(self.save_dir, "wrong_predictions.csv"), index=False)
+
+        return test_metrics
 
     def set_training_arguments(self):
         self.training_args = TrainingArguments(
