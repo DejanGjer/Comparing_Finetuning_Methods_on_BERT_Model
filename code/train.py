@@ -27,23 +27,18 @@ class Train:
         # sweep hyperparameters
         self.learning_rate = hyperparameters["learning_rate"]
         self.weight_decay = hyperparameters["weight_decay"]
-        self.batch_size = hyperparameters["batch_size"]
-        # self.r = hyperparameters["r"]
-        # self.lora_alpha = hyperparameters["lora_alpha"]
-        # self.lora_dropout = hyperparameters["lora_dropout"]
-        # self.lora_bias = hyperparameters["lora_bias"]
-        # self.lora_use_linear_layers = hyperparameters["lora_use_linear_layers"]
-        self.r = config.r
-        self.lora_alpha = config.lora_alpha
-        self.lora_dropout = config.lora_dropout
-        self.lora_bias = config.lora_bias
-        self.lora_use_linear_layers = config.lora_use_linear_layers
+        self.lora_use_linear_layers = hyperparameters["lora_use_linear_layers"]
 
         # config parameters
+        self.batch_size = config.batch_size
         self.max_epochs = config.max_epochs
         self.early_stopping_patience = config.early_stopping_patience
         self.model_name = config.model_name
         self.use_lora = config.use_lora
+        self.r = config.r
+        self.lora_alpha = config.lora_alpha
+        self.lora_dropout = config.lora_dropout
+        self.lora_bias = config.lora_bias
         self.use_sampling = config.use_sampling
         self.sample_size = config.sample_size
         self.do_test = config.do_test
@@ -72,6 +67,8 @@ class Train:
             f.write(f"r: {self.r}\n")
             f.write(f"lora_alpha: {self.lora_alpha}\n")
             f.write(f"lora_dropout: {self.lora_dropout}\n")
+            f.write(f"lora_bias: {self.lora_bias}\n")
+            f.write(f"lora_use_linear_layers: {self.lora_use_linear_layers}\n")
             f.write(f"use_sampling: {self.use_sampling}\n")
             f.write(f"sample_size: {self.sample_size}\n")
             f.write(f"do_test: {self.do_test}\n")
