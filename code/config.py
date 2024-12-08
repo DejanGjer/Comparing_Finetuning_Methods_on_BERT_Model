@@ -5,19 +5,18 @@ r = 2
 lora_alpha = 16
 lora_dropout = 0.1
 lora_bias = "none"
-# lora_use_linear_layers = False
 
 # sampling
-use_sampling = False
-sample_size = 160
+use_sampling = True
+sample_size = 1600
 
 # model
 model_name = 'bert-base-uncased'
 # training
 batch_size = 16
-max_epochs = 10 
+max_epochs = 2
 early_stopping_patience = 4
-log_steps = 250
+log_steps = 25
 
 # test
 do_test = True
@@ -25,7 +24,7 @@ num_samples_to_show = 50
 
 # save directory
 root_save_dir = './results'
-save_checkpoint_limit = 2
+save_checkpoint_limit = 3
 
 # seed
 data_seed = 42

@@ -26,7 +26,8 @@ def prepare_params(args):
         'learning_rate': args.learning_rate,
         'weight_decay': args.weight_decay,
         'batch_size': args.batch_size,
-        'epochs': args.epochs
+        'max_epochs': args.max_epochs,
+        'lora_use_linear_layers': args.lora_use_linear_layers
     }
     return params
 
@@ -37,17 +38,20 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Emotion Classification")
 
     # Add arguments
-    parser.add_argument('--learning_rate', type=float, default=3e-5,
+    parser.add_argument('--learning_rate', type=float, default=1e-3,
                         help='Learning rate for the training (default: 3e-5)')
     
-    parser.add_argument('--weight_decay', type=float, default=0.01,
+    parser.add_argument('--weight_decay', type=float, default=0.001,
                         help='Weight decay for regularization (default: 0.01)')
 
     parser.add_argument('--batch_size', type=int, default=16,
                         help='Batch size for training (default: 16)')
 
-    parser.add_argument('--epochs', type=int, default=2,
+    parser.add_argument('--max_epochs', type=int, default=2,
                         help='Number of training epochs (default: 2)')
+    
+    parser.add_argument('--lora_use_linear_layers', action='store_true', default=False,
+                        help='Use linear layers in Lora (default: False)')
     
     parser.add_argument('--new_sweep', action='store_true', default=False,
                         help='Create a new sweep (default: False)')

@@ -1,5 +1,5 @@
 # Ignore Python cache files
-__pycache__/
+**/__pycache__/
 
 # Ignore virtual environment files
 venv/
@@ -65,3 +65,11 @@ dev/
 
 # Ignore any custom directories or files specific to your project
 # Add specific filenames or directories if needed
+
+# Ignore slurm out and error files
+*/slurm_log/*
+*/slurm*.out
+*/slurm*.err
+
+# Ignore cached dataset files
+*/cached_datasets/*

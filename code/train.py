@@ -9,7 +9,6 @@ from transformers import (
 )
 from peft import get_peft_config, PeftModel, PeftConfig, get_peft_model, LoraConfig, TaskType, LoraConfig
 import evaluate
-import torch
 import numpy as np
 from datetime import datetime as dt
 import os
@@ -25,13 +24,13 @@ class Train:
         self.run_name = run_name
 
         # sweep hyperparameters
-        self.learning_rate = hyperparameters["learning_rate"]
-        self.weight_decay = hyperparameters["weight_decay"]
-        self.lora_use_linear_layers = hyperparameters["lora_use_linear_layers"]
+        self.learning_rate = hyperparameters["learning_rate"] if "learning_rate" in hyperparameters else config.learning_rate
+        self.weight_decay = hyperparameters["weight_decay"] if "weight_decay" in hyperparameters else config.weight_decay
+        self.batch_size = hyperparameters["batch_size"] if "batch_size" in hyperparameters else config.batch_size
+        self.max_epochs = hyperparameters["max_epochs"] if "max_epochs" in hyperparameters else config.max_epochs
+        self.lora_use_linear_layers = hyperparameters["lora_use_linear_layers"] if "lora_use_linear_layers" in hyperparameters else config.lora_use_linear_layers
 
         # config parameters
-        self.batch_size = config.batch_size
-        self.max_epochs = config.max_epochs
         self.early_stopping_patience = config.early_stopping_patience
         self.model_name = config.model_name
         self.use_lora = config.use_lora
@@ -202,7 +201,7 @@ class Train:
         return self.tokenizer(batch["text"], padding="max_length", truncation=True)
 
     def load_and_prepare_dataset(self):
-        emotion_dataset = load_dataset("dair-ai/emotion")
+        emotion_dataset = load_dataset("dair-ai/emotion", cache_dir="./cached_datasets")
         self.label2id = {text: num for num, text in enumerate(emotion_dataset["train"].features["label"].names)}
         self.id2label = {num: text for num, text in enumerate(emotion_dataset["train"].features["label"].names)}
         if self.use_sampling:
